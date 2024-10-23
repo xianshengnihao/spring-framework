@@ -343,10 +343,12 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 
 		// Use defaults if no transaction definition given.
 		TransactionDefinition def = (definition != null ? definition : TransactionDefinition.withDefaults());
-
+		// TODO 重点看 这里会创建一个新的DataSourceTransactionObject，
+		// DataSourceTransactionObject 对象封装了 ConnectionHolder ，ConnectionHolder封装了数据看链接，但是首次进入ConnectionHolder对象一定为空
 		Object transaction = doGetTransaction();
 		boolean debugEnabled = logger.isDebugEnabled();
 
+		// 判断是否存在事物，也就是判断ConnectionHolder对象是否为空，如果不为空判断链接是否处于活动状态，首次进入不会走这个逻辑
 		if (isExistingTransaction(transaction)) {
 			// Existing transaction found -> check propagation behavior to find out how to behave.
 			return handleExistingTransaction(def, transaction, debugEnabled);
@@ -370,6 +372,7 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 				logger.debug("Creating new transaction with name [" + def.getName() + "]: " + def);
 			}
 			try {
+				// TODO  开始事务 重点看,走到这里一定会开启新事物，也就是创建新的链接，并且放入到 thread local 中，因为如果有事物存在的话上面就 return 了
 				return startTransaction(def, transaction, debugEnabled, suspendedResources);
 			}
 			catch (RuntimeException | Error ex) {
@@ -395,8 +398,10 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			boolean debugEnabled, @Nullable SuspendedResourcesHolder suspendedResources) {
 
 		boolean newSynchronization = (getTransactionSynchronization() != SYNCHRONIZATION_NEVER);
+
 		DefaultTransactionStatus status = newTransactionStatus(
 				definition, transaction, true, newSynchronization, debugEnabled, suspendedResources);
+		// TODO 开启事物
 		doBegin(transaction, definition);
 		prepareSynchronization(status, definition);
 		return status;

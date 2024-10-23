@@ -242,6 +242,8 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 	protected Object doGetTransaction() {
 		DataSourceTransactionObject txObject = new DataSourceTransactionObject();
 		txObject.setSavepointAllowed(isNestedTransactionAllowed());
+		// 这里先获取到数据源对象，然后根据数据源从上下文获取ConnectionHolder对象，ConnectionHolder对象是对数据库链接对象的一个封装，首次进入这里肯定为空，
+		// 所以后续会有创建一个新的数据库链接并且封装为ConnectionHolder对象，然后放入到ThreadLocal 的一个操作
 		ConnectionHolder conHolder =
 				(ConnectionHolder) TransactionSynchronizationManager.getResource(obtainDataSource());
 		txObject.setConnectionHolder(conHolder, false);
@@ -260,12 +262,15 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 		Connection con = null;
 
 		try {
+			// 如果当前线程中所使用的DataSource还没有创建过数据库连接，就获取一个新的数据库连接
 			if (!txObject.hasConnectionHolder() ||
 					txObject.getConnectionHolder().isSynchronizedWithTransaction()) {
+				// 获取一个新的数据库链接
 				Connection newCon = obtainDataSource().getConnection();
 				if (logger.isDebugEnabled()) {
 					logger.debug("Acquired Connection [" + newCon + "] for JDBC transaction");
 				}
+				// 将数据库链接封装为ConnectionHolder对象 添加到DataSourceTransactionObject对象中，并且将事物状态设置为新事物
 				txObject.setConnectionHolder(new ConnectionHolder(newCon), true);
 			}
 
@@ -279,6 +284,7 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 			// Switch to manual commit if necessary. This is very expensive in some JDBC drivers,
 			// so we don't want to do it unnecessarily (for example if we've explicitly
 			// configured the connection pool to set it already).
+			// 关闭自动提交，也就是开启事物
 			if (con.getAutoCommit()) {
 				txObject.setMustRestoreAutoCommit(true);
 				if (logger.isDebugEnabled()) {
@@ -286,17 +292,21 @@ public class DataSourceTransactionManager extends AbstractPlatformTransactionMan
 				}
 				con.setAutoCommit(false);
 			}
-
+			
+			// 这里如果事物注解配置了 readOnly 为 true 则会设置事物为只读事物
 			prepareTransactionalConnection(con, definition);
+			// 修改事物活动状态
 			txObject.getConnectionHolder().setTransactionActive(true);
 
+			// 设置数据库连接的过期时间
 			int timeout = determineTimeout(definition);
 			if (timeout != TransactionDefinition.TIMEOUT_DEFAULT) {
 				txObject.getConnectionHolder().setTimeoutInSeconds(timeout);
 			}
-
-			// Bind the connection holder to the thread.
 			if (txObject.isNewConnectionHolder()) {
+				// 这一步就是将封装了数据库链接对象的connectionHolder添加到 ThreadLocal 中
+				// ThreadLocal里面是十个 Map  key 为数据源对象，value 为connectionHolder，
+				// 这样就可以实现在同一个线程内使用同一个数据源的前提下获取到的一定是同一个链接
 				TransactionSynchronizationManager.bindResource(obtainDataSource(), txObject.getConnectionHolder());
 			}
 		}
