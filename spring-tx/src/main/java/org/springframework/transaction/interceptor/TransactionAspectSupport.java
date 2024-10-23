@@ -609,7 +609,7 @@ public abstract class TransactionAspectSupport implements BeanFactoryAware, Init
 				}
 			}
 		}
-		// 返回一个TransactionInfo对象，表示得到了一个事务，可能是新创建的一个事务，也可能是拿到的已有的事务
+		// 返回一个TransactionInfo对象，表示得到了一个事务，可能是新创建的一个事务，也可能是拿到的已有的事务，也可能是没有事物
 		return prepareTransactionInfo(tm, txAttr, joinpointIdentification, status);
 	}
 

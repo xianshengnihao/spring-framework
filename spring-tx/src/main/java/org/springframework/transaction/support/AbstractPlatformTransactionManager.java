@@ -364,6 +364,9 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			throw new IllegalTransactionStateException(
 					"No existing transaction found for transaction marked with propagation 'mandatory'");
 		}
+		// PROPAGATION_REQUIRED：如果当前已经有一个事务在运行，那么被调用的方法将在当前事务中运行，如果当前没有事务，Spring 会启动一个新的事务。
+		// PROPAGATION_REQUIRES_NEW：每次都会启动一个新的事务，挂起当前的事务（如果存在）。新事务的提交或回滚不会影响外部事务，外部事务的提交或回滚也不会影响该新事务。
+		// PROPAGATION_NESTED：嵌套事务，设计到数据库的回滚点 TODO 暂时没有遇到过应用场景
 		else if (def.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRED ||
 				def.getPropagationBehavior() == TransactionDefinition.PROPAGATION_REQUIRES_NEW ||
 				def.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NESTED) {
@@ -418,11 +421,14 @@ public abstract class AbstractPlatformTransactionManager implements PlatformTran
 			throw new IllegalTransactionStateException(
 					"Existing transaction found for transaction marked with propagation 'never'");
 		}
-
+		// 如果当前存在事务，那么方法将在事务中执行。
+		// 如果当前没有事务，方法将以非事务方式执行。
+		// 进入到handleExistingTransaction一定是存在事物的
 		if (definition.getPropagationBehavior() == TransactionDefinition.PROPAGATION_NOT_SUPPORTED) {
 			if (debugEnabled) {
 				logger.debug("Suspending current transaction");
 			}
+			// 挂起当前事物
 			Object suspendedResources = suspend(transaction);
 			boolean newSynchronization = (getTransactionSynchronization() == SYNCHRONIZATION_ALWAYS);
 			return prepareTransactionStatus(
